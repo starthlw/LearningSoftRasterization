@@ -18,7 +18,7 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
 
 则得到的结果如下：
 
-<img src="D:\Code\tinyrenderer\README_image\image-20220712154504800.png" alt="image-20220712154504800" style="zoom:50%;" />
+<img src="README_image\image-20220712154504800.png" alt="image-20220712154504800" style="zoom:50%;" />
 
 但是这种方法显然效率极低，还可能存在大量重复绘制。
 
@@ -39,7 +39,7 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
 - 如果x0大于x1就不绘制了
 - 如果x方向太陡峭，则出现大量断电
 
-<img src="D:\Code\tinyrenderer\README_image\image-20220712154539445.png" alt="image-20220712154539445" style="zoom:50%;" />
+<img src="README_image\image-20220712154539445.png" alt="image-20220712154539445" style="zoom:50%;" />
 
 这两个问题可以通过换序解决
 
@@ -69,7 +69,7 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
 
 此时结果正常了
 
-<img src="D:\Code\tinyrenderer\README_image\image-20220712155027772.png" alt="image-20220712155027772" style="zoom:50%;" />
+<img src="README_image\image-20220712155027772.png" alt="image-20220712155027772" style="zoom:50%;" />
 
 但是上面的代码的性能还存在优化空间，可以看到for循环中多算了很多次(x1-x0)和(y1-y0)，可以尝试把这些累积量剥离出来，如下
 
@@ -166,7 +166,7 @@ triangle(t1[0], t1[1], t1[2], image, white);
 triangle(t2[0], t2[1], t2[2], image, green);
 ```
 
-<img src="D:\Code\tinyrenderer\README_image\image-20220712161217462.png" alt="image-20220712161217462" style="zoom:50%;" />
+<img src="README_image\image-20220712161217462.png" alt="image-20220712161217462" style="zoom:50%;" />
 
 
 
@@ -204,7 +204,7 @@ void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color) {
 }
 ```
 
-<img src="D:\Code\tinyrenderer\README_image\image-20220712161411877.png" alt="image-20220712161411877" style="zoom:50%;" />
+<img src="README_image\image-20220712161411877.png" alt="image-20220712161411877" style="zoom:50%;" />
 
 由于两个for循环存在大量相似代码，可以这么合并下
 
