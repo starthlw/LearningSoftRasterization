@@ -2,7 +2,7 @@ LearningSoftRasterization from https://github.com/ssloy/tinyrenderer
 
 
 
-## Bresenham’s Line Drawing Algorithm
+# 1 Bresenham’s Line Drawing Algorithm
 
 普通的方法，直接如下按0.01的step进行绘制
 
@@ -139,13 +139,13 @@ void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
 } 
 ```
 
- 
+ 这就是Bresenham’s Line Drawing Algorithm。
 
 
 
-## Triangle rasterization and back face culling
+# 2 Triangle rasterization and back face culling
 
-### 旧扫描线算法
+## 2.1 旧扫描线算法
 
 首先可以画这么几个三角形
 
@@ -233,7 +233,7 @@ void triangle(Vec2i t0, Vec2i t1, Vec2i t2, TGAImage &image, TGAColor color) {
 
 这就是为单线程设计的老扫描线算法。
 
-### 扫描线算法优化
+## 2.2 扫描线算法优化
 
 老的方法需要遍历整个画面，这样如果三角形占用面积较小，则GPU计算时许多Quad是在空跑，更好的办法是算出三角形的AABB包围盒，然后通过判断点是否在三角形内的方法进行绘制，
 
@@ -247,12 +247,12 @@ P点在三角形内部的充分必要条件是：1 >= u >= 0, 1 >= v >= 0, u+v <
 
 解方程:
 
-$\left\{\begin{array}{r}
+$$\left\{\begin{array}{r}
 u \overrightarrow{A B}_{x}+v \overrightarrow{A C}_{x}+\overrightarrow{P A}_{x}=0 \\
 u \overrightarrow{A B}_{y}+v \overrightarrow{A C}_{y}+\overrightarrow{P A}_{y}=0
-\end{array}\right.$
+\end{array}\right.$$
 
-$\left\{\begin{array}{c}
+$$\left\{\begin{array}{c}
 {\left[\begin{array}{lll}
 u & v & 1
 \end{array}\right]\left[\begin{array}{l}
@@ -267,7 +267,7 @@ u & v & 1
 \overrightarrow{A C}_{y} \\
 \overrightarrow{P A}_{y}
 \end{array}\right]=0}
-\end{array}\right.$
+\end{array}\right.$$$$
 
 即向量[u,v,1]，$[\overrightarrow{A B}_{x},\overrightarrow{A C}_{x},\overrightarrow{P A}_{x}]$, $[\overrightarrow{A B}_{y},\overrightarrow{A C}_{y},\overrightarrow{P A}_{y}]$ 间两两垂直，那么就能如下barycentric函数中求解得到uv
 
@@ -300,6 +300,166 @@ void triangle(Vec2i *pts, TGAImage &image, TGAColor color) {
     } 
 } 
 ```
+
+以上两节代码本人放到 [starthlw/LearningSoftRasterization at lesson2 (github.com)](https://github.com/starthlw/LearningSoftRasterization/tree/lesson2)
+
+下一节代码发生了比较大的变动。
+
+# 3 Hidden faces removal (z buffer)
+
+深度判断无非就是在着色的时候增加一个相机方向的深度比较，更靠近相机则进行着色计算
+
+```c
+
+void triangle(Vec3i t0, Vec3i t1, Vec3i t2, TGAImage& image, TGAColor color, int* zbuffer) {
+    if (t0.y == t1.y && t0.y == t2.y) return; 
+    if (t0.y > t1.y) std::swap(t0, t1);
+    if (t0.y > t2.y) std::swap(t0, t2);
+    if (t1.y > t2.y) std::swap(t1, t2);
+    int total_height = t2.y - t0.y;
+    for (int i = 0; i < total_height; i++) {
+        bool second_half = i > t1.y - t0.y || t1.y == t0.y;
+        int segment_height = second_half ? t2.y - t1.y : t1.y - t0.y;
+        float alpha = (float)i / total_height;
+        float beta = (float)(i - (second_half ? t1.y - t0.y : 0)) / segment_height;
+        Vec3i A = t0 + (t2 - t0) * alpha;
+        Vec3i B = second_half ? t1 + (t2 - t1) * beta : t0 + (t1 - t0) * beta;
+        if (A.x > B.x) std::swap(A, B);
+        for (int j = A.x; j <= B.x; j++) {
+            float phi = B.x == A.x ? 1. : (float)(j - A.x) / (float)(B.x - A.x);
+            Vec3i P = A + (B - A) * phi;
+            P.x = j; P.y = t0.y + i; // a hack to fill holes (due to int cast precision problems)
+            int idx = j + (t0.y + i) * width;
+            if (zbuffer[idx] < P.z) { // 此处增加深度判断
+                zbuffer[idx] = P.z;
+                image.set(P.x, P.y, color); // attention, due to int casts t0.y+i != A.y
+            }
+        }
+    }
+}
+```
+
+
+
+# 4 Perspective projection
+
+GAMES101已有深入讲解，待补充推导计算
+
+
+
+# 5 Moving the camera
+
+要移动相机，则需要较为完整的渲染过程：
+
+1. vertex shader中完成local->world->view->viewport的坐标转化
+   1. 根据视角位置，up方向，世界坐标原点直接获取ModelView矩阵，即view * model
+   2. 根据视角位置和世界坐标原点计算投影矩阵
+   3. 根据屏幕大小计算viewport矩阵
+   4. gl_Vertex = Viewport * Projection * ModelView * gl_Vertex; 
+2. fragment shader中完成着色计算
+
+大体代码如下：
+
+```c
+void viewport(int x, int y, int w, int h) {
+    Viewport = Matrix::identity();
+    Viewport[0][3] = x+w/2.f;
+    Viewport[1][3] = y+h/2.f;
+    Viewport[2][3] = 255.f/2.f;
+    Viewport[0][0] = w/2.f;
+    Viewport[1][1] = h/2.f;
+    Viewport[2][2] = 255.f/2.f;
+}
+
+void projection(float coeff) {
+    Projection = Matrix::identity();
+    Projection[3][2] = coeff;
+}
+
+void lookat(Vec3f eye, Vec3f center, Vec3f up) {
+    Vec3f z = (eye-center).normalize();
+    Vec3f x = cross(up,z).normalize();
+    Vec3f y = cross(z,x).normalize();
+    ModelView = Matrix::identity();
+    for (int i=0; i<3; i++) {
+        ModelView[0][i] = x[i];
+        ModelView[1][i] = y[i];
+        ModelView[2][i] = z[i];
+        ModelView[i][3] = -center[i];
+    }
+}
+
+void triangle(Vec3i *pts, IShader &shader, TGAImage &image, TGAImage &zbuffer) {
+    Vec2i bboxmin( std::numeric_limits<int>::max(),  std::numeric_limits<int>::max());
+    Vec2i bboxmax(-std::numeric_limits<int>::max(), -std::numeric_limits<int>::max());
+    for (int i=0; i<3; i++) {
+        for (int j=0; j<2; j++) {
+            bboxmin[j] = std::min(bboxmin[j], pts[i][j]);
+            bboxmax[j] = std::max(bboxmax[j], pts[i][j]);
+        }
+    }
+    Vec3i P;
+    TGAColor color;
+    for (P.x=bboxmin.x; P.x<=bboxmax.x; P.x++) {
+        for (P.y=bboxmin.y; P.y<=bboxmax.y; P.y++) {
+            Vec3f c = barycentric(pts[0], pts[1], pts[2], P);
+            P.z = std::max(0, std::min(255, int(pts[0].z*c.x + pts[1].z*c.y + pts[2].z*c.z + .5))); // clamping to 0-255 since it is stored in unsigned char
+            if (c.x<0 || c.y<0 || c.z<0 || zbuffer.get(P.x, P.y)[0]>P.z) continue;
+            bool discard = shader.fragment(c, color);
+            if (!discard) {
+                zbuffer.set(P.x, P.y, TGAColor(P.z));
+                image.set(P.x, P.y, color);
+            }
+        }
+    }
+}
+
+int main(int argc, char** argv) {
+    // ...
+    lookat(eye, center, up);
+    viewport(width/8, height/8, width*3/4, height*3/4);
+    projection(-1.f/(eye-center).norm());
+    light_dir.normalize();
+
+    TGAImage image  (width, height, TGAImage::RGB);
+    TGAImage zbuffer(width, height, TGAImage::GRAYSCALE);
+
+    GouraudShader shader;
+    for (int i=0; i<model->nfaces(); i++) {
+        Vec3i screen_coords[3];
+        for (int j=0; j<3; j++) {
+            screen_coords[j] = shader.vertex(i, j);
+        }
+        triangle(screen_coords, shader, image, zbuffer);
+    }
+
+    image.  flip_vertically();
+    zbuffer.flip_vertically();
+    image.  write_tga_file("output.tga");
+    zbuffer.write_tga_file("zbuffer.tga");
+
+    delete model;
+    return 0;
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
