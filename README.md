@@ -247,12 +247,12 @@ P点在三角形内部的充分必要条件是：1 >= u >= 0, 1 >= v >= 0, u+v <
 
 解方程:
 
-$\left\{\begin{array}{r}
+$$\left\{\begin{array}{r}
 u \overrightarrow{A B}_{x}+v \overrightarrow{A C}_{x}+\overrightarrow{P A}_{x}=0 \\
 u \overrightarrow{A B}_{y}+v \overrightarrow{A C}_{y}+\overrightarrow{P A}_{y}=0
-\end{array}\right.$
+\end{array}\right.$$
 
-$\left\{\begin{array}{c}
+$$\left\{\begin{array}{c}
 {\left[\begin{array}{lll}
 u & v & 1
 \end{array}\right]\left[\begin{array}{l}
@@ -267,9 +267,9 @@ u & v & 1
 \overrightarrow{A C}_{y} \\
 \overrightarrow{P A}_{y}
 \end{array}\right]=0}
-\end{array}\right.$
+\end{array}\right.$$
 
-即向量[u,v,1]，$[\overrightarrow{A B}_{x},\overrightarrow{A C}_{x},\overrightarrow{P A}_{x}]$, $[\overrightarrow{A B}_{y},\overrightarrow{A C}_{y},\overrightarrow{P A}_{y}]$ 间两两垂直，那么就能如下barycentric函数中求解得到uv
+即向量[u,v,1], $[\overrightarrow{A B}_{x},\overrightarrow{A C}_{x},\overrightarrow{P A}_{x}]$, $[\overrightarrow{A B}_{y},\overrightarrow{A C}_{y},\overrightarrow{P A}_{y}]$ 间两两垂直，那么就能如下barycentric函数中求解得到uv
 
 ```c
 Vec3f barycentric(Vec2i *pts, Vec2i P) { 
